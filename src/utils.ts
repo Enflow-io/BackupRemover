@@ -25,3 +25,15 @@ export const createTestFiles = () => {
         }
     }
 };
+
+
+export const periodToSeconds = (input: string): number => {
+    let p: any = input
+           .replace('h', 'x3600')
+           .replace('d', 'x86400')
+           .replace('w', 'x604800')
+           .replace('m', 'x2.628e+6')
+           .replace('y', 'x3.154e+7').split('x')
+
+    return (p[0] || 0) * (p[1] || 0);
+  }
