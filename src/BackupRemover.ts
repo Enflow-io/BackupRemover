@@ -3,22 +3,20 @@ const fs = require("fs");
 import { DateTime } from "luxon";
 import { periodToSeconds } from "./utils";
 
-
-
 interface DayFile {
-    filename: string
-    date: DateTime
+    filename: string;
+    date: DateTime;
 }
 
 interface Days {
-    [key: string]: DayFile[]
+    [key: string]: DayFile[];
 }
 
 export default class BackupRemover {
     private fileNameTemplate: string;
 
     private freshBackupsDate: DateTime;
-    // private dailyBackupsDate: DateTime;
+    private oldestBackupDate: DateTime;
 
     constructor(private readonly backupPath: string) {
         this.backupPath = process.env.BACKUP_PATH || path.join(__dirname, "..", "backups");
@@ -34,9 +32,15 @@ export default class BackupRemover {
             })
             .startOf("day");
 
-        // this.dailyBackupsDate = DateTime.fromJSDate(new Date()).minus({
-        //     days: parseInt(process.env.DAILY_BACKUPS_DATE)
-        // })
+        if (!process.env.BACKUP_PERIOD) {
+            throw new Error("DAILY_BACKUPS_DATE is not set");
+        }
+
+        this.oldestBackupDate = DateTime.fromJSDate(new Date())
+            .minus({
+                seconds: periodToSeconds(process.env.BACKUP_PERIOD),
+            })
+            .startOf("day");
     }
 
     public remove(): void {
@@ -61,26 +65,25 @@ export default class BackupRemover {
                 return group;
             }, {});
 
-            console.log(days)
-
         for (let [day, files] of Object.entries(days)) {
             console.log("day", day);
             console.log("files", files);
 
-
             const dayDate = DateTime.fromFormat(day, "dd.MM.yyyy");
-            
+
             // если старше freshBackupsDate
-            if(dayDate < this.freshBackupsDate) {
-                console.log(`Removing ${files.map(el=>el.filename).join(", ")}`);
+            if (dayDate <= this.freshBackupsDate) {
+                console.log(`Removing ${files.map((el) => el.filename).join(", ")}`);
+            } else if (dayDate > this.freshBackupsDate && dayDate <= this.oldestBackupDate) {
+                console.log(`Keeping ${files.map((el) => el.filename).join(", ")}`);
+            }else{
+                console.log(`Removing ${files.map((el) => el.filename).join(", ")}`);
             }
 
             // если меньше недели - оставляем
-            
-            // если несколько файлов, сотрируем по дате создания, удаляем все кроме последнего
-            
-        }
 
+            // если несколько файлов, сотрируем по дате создания, удаляем все кроме последнего
+        }
 
         // for (let file of files) {
         //     console.log(this.freshBackupsDate.toString());
@@ -102,7 +105,6 @@ export default class BackupRemover {
     }
 
     public getDateFromFileName(fileName: string): DateTime {
-
         // TODO получить дату из мета информации
 
         const template = this.fileNameTemplate; //.replace("*", "(.*)");
@@ -135,5 +137,5 @@ export default class BackupRemover {
     private getFileCreationDate = (filename: string): DateTime => {
         const { birthtime } = fs.statSync(filename);
         return DateTime.fromJSDate(birthtime);
-    }
+    };
 }
